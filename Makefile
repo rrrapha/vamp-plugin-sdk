@@ -4,6 +4,7 @@
 # suit your operating system requirements.
 
 SDKDIR		= vamp-sdk
+HOSTSDKDIR      = vamp-hostsdk
 APIDIR		= vamp
 EXAMPLEDIR	= examples
 HOSTDIR		= host
@@ -36,17 +37,17 @@ INSTALL_PKGCONFIG	  := $(INSTALL_PREFIX)/lib/pkgconfig
 
 # Compile flags
 #
-CXXFLAGS	:= $(CXXFLAGS) -O2 -Wall -I$(SDKDIR) -I$(APIDIR) -I.
+CXXFLAGS	:= $(CXXFLAGS) -O2 -Wall -I$(SDKDIR) -I$(HOSTSDKDIR) -I$(APIDIR) -I.
 
 # Libraries required for the host at link time
 #
-HOST_LIBS	= vamp-sdk/libvamp-hostsdk.a -lsndfile -ldl
+HOST_LIBS	= $(HOSTSDKDIR)/libvamp-hostsdk.a -lsndfile -ldl
 
 # Libraries required for the plugin.  Note that we can (and actively
 # want to) statically link libstdc++, because our plugin exposes only
 # a C API so there are no boundary compatibility problems.
 #
-PLUGIN_LIBS	= vamp-sdk/libvamp-sdk.a
+PLUGIN_LIBS	= $(SDKDIR)/libvamp-sdk.a
 #PLUGIN_LIBS	= vamp-sdk/libvamp-sdk.a $(shell g++ -print-file-name=libstdc++.a)
 
 # Flags required to tell the compiler to link to a dynamically loadable object
@@ -76,7 +77,9 @@ SDK_HEADERS	= \
 HOSTSDK_HEADERS	= \
 		$(SDKDIR)/Plugin.h \
 		$(SDKDIR)/PluginBase.h \
-		$(SDKDIR)/PluginHostAdapter.h \
+		$(HOSTSDKDIR)/PluginHostAdapter.h \
+		$(HOSTSDKDIR)/PluginInputDomainAdapter.h \
+		$(HOSTSDKDIR)/PluginLoader.h \
 		$(SDKDIR)/RealTime.h
 
 SDK_OBJECTS	= \
@@ -84,20 +87,22 @@ SDK_OBJECTS	= \
 		$(SDKDIR)/RealTime.o
 
 HOSTSDK_OBJECTS	= \
-		$(SDKDIR)/PluginHostAdapter.o \
+		$(HOSTSDKDIR)/PluginHostAdapter.o \
+		$(HOSTSDKDIR)/PluginInputDomainAdapter.o \
+		$(HOSTSDKDIR)/PluginLoader.o \
 		$(SDKDIR)/RealTime.o
 
 SDK_STATIC	= \
 		$(SDKDIR)/libvamp-sdk.a
 
 HOSTSDK_STATIC	= \
-		$(SDKDIR)/libvamp-hostsdk.a
+		$(HOSTSDKDIR)/libvamp-hostsdk.a
 
 SDK_DYNAMIC	= \
 		$(SDKDIR)/libvamp-sdk.so
 
 HOSTSDK_DYNAMIC	= \
-		$(SDKDIR)/libvamp-hostsdk.so
+		$(HOSTSDKDIR)/libvamp-hostsdk.so
 
 SDK_LA		= \
 		$(SDKDIR)/libvamp-sdk.la

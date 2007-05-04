@@ -36,11 +36,12 @@
 */
 
 #include "PluginHostAdapter.h"
+#include "PluginInputDomainAdapter.h"
+#include "PluginLoader.h"
 #include "vamp.h"
 
 #include <iostream>
 #include <sndfile.h>
-#include <dirent.h> // POSIX directory open and read
 
 #include "system.h"
 
@@ -58,10 +59,7 @@ void printFeatures(int, int, int, Vamp::Plugin::FeatureSet);
 void transformInput(float *, size_t);
 void fft(unsigned int, bool, double *, double *, double *, double *);
 void printPluginPath();
-
-#ifdef HAVE_OPENDIR
 void enumeratePlugins();
-#endif
 
 /*
     A very simple Vamp plugin host.  Given the name of a plugin
@@ -72,7 +70,12 @@ void enumeratePlugins();
 
 int main(int argc, char **argv)
 {
-    if (argc < 2 || argc > 4) {
+    if (argc < 2 || argc > 4 ||
+        (argc == 2 &&
+         (!strcmp(argv[1], "-?") ||
+          !strcmp(argv[1], "-h") ||
+          !strcmp(argv[1], "--help")))) {
+
         char *scooter = argv[0];
         char *name = 0;
         while (scooter && *scooter) {
@@ -113,9 +116,7 @@ int main(int argc, char **argv)
     }
     
     if (argc == 2 && !strcmp(argv[1], "-l")) {
-#ifdef HAVE_OPENDIR
         enumeratePlugins();
-#endif
         return 0;
     }
     if (argc == 2 && !strcmp(argv[1], "-p")) {
@@ -209,8 +210,9 @@ int main(int argc, char **argv)
 	return 1;
     }
 
-    Vamp::PluginHostAdapter *plugin =
-        new Vamp::PluginHostAdapter(descriptor, sfinfo.samplerate);
+    Vamp::Plugin *plugin =
+        new Vamp::PluginInputDomainAdapter
+        (new Vamp::PluginHostAdapter(descriptor, sfinfo.samplerate));
 
     cerr << "Running " << plugin->getIdentifier() << "..." << endl;
 
@@ -334,13 +336,6 @@ int main(int argc, char **argv)
             }
         }
 
-        if (plugin->getInputDomain() == Vamp::Plugin::FrequencyDomain) {
-            for (int c = 0; c < sfinfo.channels; ++c) {
-                transformInput(plugbuf[c], blockSize);
-                if (mix) break;
-            }
-        }
-
         printFeatures
             (i, sfinfo.samplerate, output, plugin->process
              (plugbuf, Vamp::RealTime::frame2RealTime(i, sfinfo.samplerate)));
@@ -368,89 +363,75 @@ printPluginPath()
     }
 }
 
-#ifdef HAVE_OPENDIR
-
 void
 enumeratePlugins()
 {
+    Vamp::PluginLoader loader;
+
     cerr << endl << "Vamp plugin libraries found in search path:" << endl;
-    vector<string> path = Vamp::PluginHostAdapter::getPluginPath();
-    for (size_t i = 0; i < path.size(); ++i) {
-        cerr << "\n" << path[i] << ":" << endl;
-        DIR *d = opendir(path[i].c_str());
-        if (!d) {
-            perror("Failed to open directory");
-            continue;
-        }
-        struct dirent *e = 0;
-        while ((e = readdir(d))) {
-//            cerr << "reading: " << e->d_name << endl;
-            if (!(e->d_type & DT_REG)) {
-//                cerr << e->d_name << ": not a regular file" << endl;
-                continue;
-            }
-            int len = strlen(e->d_name);
-            if (len < int(strlen(PLUGIN_SUFFIX) + 2) ||
-                e->d_name[len - strlen(PLUGIN_SUFFIX) - 1] != '.' ||
-                strcmp(e->d_name + len - strlen(PLUGIN_SUFFIX), PLUGIN_SUFFIX)) {
-//                cerr << e->d_name << ": not a library file" << endl;
-                continue;
-            }
-            char *fp = new char[path[i].length() + len + 3];
-            sprintf(fp, "%s/%s", path[i].c_str(), e->d_name);
-            void *handle = DLOPEN(string(fp), RTLD_LAZY);
-            if (handle) {
-                VampGetPluginDescriptorFunction fn =
-                    (VampGetPluginDescriptorFunction)DLSYM
-                    (handle, "vampGetPluginDescriptor");
-                if (fn) {
-                    cerr << "\n  " << e->d_name << ":" << endl;
-                    int index = 0;
-                    const VampPluginDescriptor *descriptor = 0;
-                    while ((descriptor = fn(VAMP_API_VERSION, index))) {
-                        Vamp::PluginHostAdapter plugin(descriptor, 48000);
-                        char c = char('A' + index);
-                        if (c > 'Z') c = char('a' + (index - 26));
-                        cerr << "    [" << c << "] [v"
-                             << plugin.getVampApiVersion() << "] "
-                             << plugin.getName()
-                             << ", \"" << plugin.getIdentifier() << "\""
-                             << " [" << plugin.getMaker()
-                             << "]" << endl;
-                        if (plugin.getDescription() != "") {
-                            cerr << "        - " << plugin.getDescription() << endl;
-                        }
-                        Vamp::Plugin::OutputList outputs =
-                            plugin.getOutputDescriptors();
-                        if (outputs.size() > 1) {
-                            for (size_t j = 0; j < outputs.size(); ++j) {
-                                cerr << "         (" << j << ") "
-                                     << outputs[j].name
-                                     << ", \"" << outputs[j].identifier << "\""
-                                     << endl;
-                                if (outputs[j].description != "") {
-                                    cerr << "             - " 
-                                         << outputs[j].description << endl;
-                                }
-                            }
-                        }
-                        ++index;
-                    }
-                } else {
-//                    cerr << e->d_name << ": no Vamp descriptor function" << endl;
-                }
-                DLCLOSE(handle);
-            } else {
-                cerr << "\n" << e->d_name << ": unable to load library (" << DLERROR() << ")" << endl;
-            }                
-        }
-        closedir(d);
+
+    std::vector<Vamp::PluginLoader::PluginKey> plugins = loader.listPlugins();
+    typedef std::multimap<std::string, Vamp::PluginLoader::PluginKey>
+        LibraryMap;
+    LibraryMap libraryMap;
+
+    for (size_t i = 0; i < plugins.size(); ++i) {
+        std::string path = loader.getLibraryPath(plugins[i]);
+        libraryMap.insert(LibraryMap::value_type(path, plugins[i]));
     }
+
+    std::string prevPath = "";
+    int index = 0;
+
+    for (LibraryMap::iterator i = libraryMap.begin();
+         i != libraryMap.end(); ++i) {
+        
+        std::string path = i->first;
+        Vamp::PluginLoader::PluginKey key = i->second;
+
+        if (path != prevPath) {
+            prevPath = path;
+            index = 0;
+            cerr << "\n  " << path << ":" << endl;
+        }
+
+        Vamp::Plugin *plugin = loader.load(key, 48000);
+        if (plugin) {
+
+            char c = char('A' + index);
+            if (c > 'Z') c = char('a' + (index - 26));
+
+            cerr << "    [" << c << "] [v"
+                 << plugin->getVampApiVersion() << "] "
+                 << plugin->getName() << ", \""
+                 << plugin->getIdentifier() << "\"" << " ["
+                 << plugin->getMaker() << "]" << endl;
+
+            if (plugin->getDescription() != "") {
+                cerr << "        - " << plugin->getDescription() << endl;
+            }
+
+            Vamp::Plugin::OutputList outputs =
+                plugin->getOutputDescriptors();
+
+            if (outputs.size() > 1) {
+                for (size_t j = 0; j < outputs.size(); ++j) {
+                    cerr << "         (" << j << ") "
+                         << outputs[j].name << ", \""
+                         << outputs[j].identifier << "\"" << endl;
+                    if (outputs[j].description != "") {
+                        cerr << "             - " 
+                             << outputs[j].description << endl;
+                    }
+                }
+            }
+
+            ++index;
+        }
+    }
+
     cerr << endl;
 }
-
-#endif
-
 
 void
 printFeatures(int frame, int sr, int output, Vamp::Plugin::FeatureSet features)
@@ -468,149 +449,5 @@ printFeatures(int frame, int sr, int output, Vamp::Plugin::FeatureSet features)
     }
 }
 
-void
-transformInput(float *buffer, size_t size)
-{
-    double *inbuf = new double[size * 2];
-    double *outbuf = new double[size * 2];
-
-    // Copy across with Hanning window
-    for (size_t i = 0; i < size; ++i) {
-        inbuf[i] = double(buffer[i]) * (0.50 - 0.50 * cos(2 * M_PI * i / size));
-        inbuf[i + size] = 0.0;
-    }
-    
-    for (size_t i = 0; i < size/2; ++i) {
-        double temp = inbuf[i];
-        inbuf[i] = inbuf[i + size/2];
-        inbuf[i + size/2] = temp;
-    }
-
-    fft(size, false, inbuf, inbuf + size, outbuf, outbuf + size);
-
-    for (size_t i = 0; i <= size/2; ++i) {
-        buffer[i * 2] = outbuf[i];
-        buffer[i * 2 + 1] = outbuf[i + size];
-    }
-    
-    delete[] inbuf;
-    delete[] outbuf;
-}
-
-void
-fft(unsigned int n, bool inverse, double *ri, double *ii, double *ro, double *io)
-{
-    if (!ri || !ro || !io) return;
-
-    unsigned int bits;
-    unsigned int i, j, k, m;
-    unsigned int blockSize, blockEnd;
-
-    double tr, ti;
-
-    if (n < 2) return;
-    if (n & (n-1)) return;
-
-    double angle = 2.0 * M_PI;
-    if (inverse) angle = -angle;
-
-    for (i = 0; ; ++i) {
-	if (n & (1 << i)) {
-	    bits = i;
-	    break;
-	}
-    }
-
-    static unsigned int tableSize = 0;
-    static int *table = 0;
-
-    if (tableSize != n) {
-
-	delete[] table;
-
-	table = new int[n];
-
-	for (i = 0; i < n; ++i) {
-	
-	    m = i;
-
-	    for (j = k = 0; j < bits; ++j) {
-		k = (k << 1) | (m & 1);
-		m >>= 1;
-	    }
-
-	    table[i] = k;
-	}
-
-	tableSize = n;
-    }
-
-    if (ii) {
-	for (i = 0; i < n; ++i) {
-	    ro[table[i]] = ri[i];
-	    io[table[i]] = ii[i];
-	}
-    } else {
-	for (i = 0; i < n; ++i) {
-	    ro[table[i]] = ri[i];
-	    io[table[i]] = 0.0;
-	}
-    }
-
-    blockEnd = 1;
-
-    for (blockSize = 2; blockSize <= n; blockSize <<= 1) {
-
-	double delta = angle / (double)blockSize;
-	double sm2 = -sin(-2 * delta);
-	double sm1 = -sin(-delta);
-	double cm2 = cos(-2 * delta);
-	double cm1 = cos(-delta);
-	double w = 2 * cm1;
-	double ar[3], ai[3];
-
-	for (i = 0; i < n; i += blockSize) {
-
-	    ar[2] = cm2;
-	    ar[1] = cm1;
-
-	    ai[2] = sm2;
-	    ai[1] = sm1;
-
-	    for (j = i, m = 0; m < blockEnd; j++, m++) {
-
-		ar[0] = w * ar[1] - ar[2];
-		ar[2] = ar[1];
-		ar[1] = ar[0];
-
-		ai[0] = w * ai[1] - ai[2];
-		ai[2] = ai[1];
-		ai[1] = ai[0];
-
-		k = j + blockEnd;
-		tr = ar[0] * ro[k] - ai[0] * io[k];
-		ti = ar[0] * io[k] + ai[0] * ro[k];
-
-		ro[k] = ro[j] - tr;
-		io[k] = io[j] - ti;
-
-		ro[j] += tr;
-		io[j] += ti;
-	    }
-	}
-
-	blockEnd = blockSize;
-    }
-
-    if (inverse) {
-
-	double denom = (double)n;
-
-	for (i = 0; i < n; i++) {
-	    ro[i] /= denom;
-	    io[i] /= denom;
-	}
-    }
-}
 
         
