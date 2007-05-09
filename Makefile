@@ -80,6 +80,7 @@ HOSTSDK_HEADERS	= \
 		$(HOSTSDKDIR)/PluginHostAdapter.h \
 		$(HOSTSDKDIR)/PluginInputDomainAdapter.h \
 		$(HOSTSDKDIR)/PluginLoader.h \
+		$(HOSTSDKDIR)/PluginWrapper.h \
 		$(SDKDIR)/RealTime.h
 
 SDK_OBJECTS	= \
@@ -90,6 +91,7 @@ HOSTSDK_OBJECTS	= \
 		$(HOSTSDKDIR)/PluginHostAdapter.o \
 		$(HOSTSDKDIR)/PluginInputDomainAdapter.o \
 		$(HOSTSDKDIR)/PluginLoader.o \
+		$(HOSTSDKDIR)/PluginWrapper.o \
 		$(SDKDIR)/RealTime.o
 
 SDK_STATIC	= \

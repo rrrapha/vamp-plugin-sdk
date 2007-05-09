@@ -41,8 +41,7 @@
 namespace Vamp {
 
 PluginInputDomainAdapter::PluginInputDomainAdapter(Plugin *plugin) :
-    Plugin(0),
-    m_plugin(plugin),
+    PluginWrapper(plugin),
     m_channels(0),
     m_blockSize(0),
     m_freqbuf(0)
@@ -51,7 +50,6 @@ PluginInputDomainAdapter::PluginInputDomainAdapter(Plugin *plugin) :
 
 PluginInputDomainAdapter::~PluginInputDomainAdapter()
 {
-    delete m_plugin;
 }
     
 bool
@@ -87,88 +85,10 @@ PluginInputDomainAdapter::initialise(size_t channels, size_t stepSize, size_t bl
     return m_plugin->initialise(channels, stepSize, blockSize);
 }
 
-void
-PluginInputDomainAdapter::reset()
+Plugin::InputDomain
+PluginInputDomainAdapter::getInputDomain() const
 {
-    m_plugin->reset();
-}
-
-unsigned int
-PluginInputDomainAdapter::getVampApiVersion() const
-{
-    return m_plugin->getVampApiVersion();
-}
-
-std::string
-PluginInputDomainAdapter::getIdentifier() const
-{
-    return m_plugin->getIdentifier();
-}
-
-std::string
-PluginInputDomainAdapter::getName() const
-{
-    return m_plugin->getName();
-}
-
-std::string
-PluginInputDomainAdapter::getDescription() const
-{
-    return m_plugin->getDescription();
-}
-
-std::string
-PluginInputDomainAdapter::getMaker() const
-{
-    return m_plugin->getMaker();
-}
-
-int
-PluginInputDomainAdapter::getPluginVersion() const
-{
-    return m_plugin->getPluginVersion();
-}
-
-std::string
-PluginInputDomainAdapter::getCopyright() const
-{
-    return m_plugin->getCopyright();
-}
-
-PluginBase::ParameterList
-PluginInputDomainAdapter::getParameterDescriptors() const
-{
-    return m_plugin->getParameterDescriptors();
-}
-
-float
-PluginInputDomainAdapter::getParameter(std::string parameter) const
-{
-    return m_plugin->getParameter(parameter);
-}
-
-void
-PluginInputDomainAdapter::setParameter(std::string parameter, float value)
-{
-    m_plugin->setParameter(parameter, value);
-}
-
-PluginBase::ProgramList
-PluginInputDomainAdapter::getPrograms() const
-{
-    return m_plugin->getPrograms();
-}
-
-std::string
-PluginInputDomainAdapter::getCurrentProgram() const
-{
-    return m_plugin->getCurrentProgram();
-}
-
-void
-PluginInputDomainAdapter::selectProgram(std::string program)
-{
-    m_plugin->selectProgram(program);
+    return TimeDomain;
 }
 
 size_t
@@ -193,23 +113,6 @@ PluginInputDomainAdapter::getPreferredBlockSize() const
     }
 
     return block;
-}
-
-size_t
-PluginInputDomainAdapter::getMinChannelCount() const
-{
-    return m_plugin->getMinChannelCount();
-}
-
-size_t PluginInputDomainAdapter::getMaxChannelCount() const
-{
-    return m_plugin->getMaxChannelCount();
-}
-
-Plugin::OutputList
-PluginInputDomainAdapter::getOutputDescriptors() const
-{
-    return m_plugin->getOutputDescriptors();
 }
 
 Plugin::FeatureSet
@@ -247,12 +150,6 @@ PluginInputDomainAdapter::process(const float *const *inputBuffers, RealTime tim
     // effectively centre the frame?
 
     return m_plugin->process(m_freqbuf, timestamp);
-}
-
-Plugin::FeatureSet
-PluginInputDomainAdapter::getRemainingFeatures()
-{
-    return m_plugin->getRemainingFeatures();
 }
 
 void

@@ -39,7 +39,11 @@
 
 #include "system.h"
 
+#include <fstream>
+
 #include <dirent.h> // POSIX directory open and read
+
+using namespace std;
 
 namespace Vamp {
 	
@@ -51,47 +55,34 @@ PluginLoader::~PluginLoader()
 {
 }
 
-std::vector<PluginLoader::PluginKey>
+vector<PluginLoader::PluginKey>
 PluginLoader::listPlugins() 
 {
     if (m_pluginLibraryMap.empty()) {
 
-        std::vector<std::string> path = PluginHostAdapter::getPluginPath();
+        vector<string> path = PluginHostAdapter::getPluginPath();
 
         size_t suffixLen = strlen(PLUGIN_SUFFIX);
 
         for (size_t i = 0; i < path.size(); ++i) {
-
-            DIR *d = opendir(path[i].c_str());
-            if (!d) {
-//                perror("Failed to open directory");
-                continue;
-            }
             
-            struct dirent *e = 0;
-            while ((e = readdir(d))) {
+            vector<string> files = getFilesInDir(path[i], PLUGIN_SUFFIX);
+            
 
-                if (!(e->d_type & DT_REG) || !e->d_name) {
-                    continue;
-                }
+            for (vector<string>::iterator fi = files.begin();
+                 fi != files.end(); ++fi) {
 
-                int len = strlen(e->d_name);
-                if (len < int(suffixLen + 2) ||
-                    e->d_name[len - suffixLen - 1] != '.' ||
-                    strcmp(e->d_name + len - suffixLen, PLUGIN_SUFFIX)) {
-                    continue;
-                }
-
-                std::string basename = e->d_name;
+                string basename = *fi;
                 basename = basename.substr(0, basename.length() - suffixLen - 1);
-                std::string fullPath = path[i].c_str();
-                fullPath = fullPath + "/" + e->d_name;
+
+                string fullPath = path[i];
+                fullPath = fullPath + "/" + *fi; //!!! systemize
                 void *handle = DLOPEN(fullPath, RTLD_LAZY);
 
                 if (!handle) {
-                    std::cerr << "Vamp::PluginLoader: " << e->d_name
+                    cerr << "Vamp::PluginLoader: " << *fi
                               << ": unable to load library (" << DLERROR()
-                              << ")" << std::endl;
+                              << ")" << endl;
                     continue;
                 }
             
@@ -118,13 +109,11 @@ PluginLoader::listPlugins()
 
                 DLCLOSE(handle);
             }
-
-            closedir(d);
         }
     }
 
-    std::vector<PluginKey> plugins;
-    for (std::map<PluginKey, std::string>::iterator mi =
+    vector<PluginKey> plugins;
+    for (map<PluginKey, string>::iterator mi =
              m_pluginLibraryMap.begin();
          mi != m_pluginLibraryMap.end(); ++mi) {
         plugins.push_back(mi->first);
@@ -133,34 +122,42 @@ PluginLoader::listPlugins()
     return plugins;
 }
 
-std::string
-PluginLoader::getLibraryPath(PluginKey key)
+PluginLoader::PluginCategoryHierarchy
+PluginLoader::getPluginCategory(PluginKey plugin)
+{
+    if (m_taxonomy.empty()) generateTaxonomy();
+    if (m_taxonomy.find(plugin) == m_taxonomy.end()) return PluginCategoryHierarchy();
+    return m_taxonomy[plugin];
+}
+
+string
+PluginLoader::getLibraryPathForPlugin(PluginKey plugin)
 {
     if (m_pluginLibraryMap.empty()) (void)listPlugins();
-    if (m_pluginLibraryMap.find(key) == m_pluginLibraryMap.end()) return "";
-    return m_pluginLibraryMap[key];
+    if (m_pluginLibraryMap.find(plugin) == m_pluginLibraryMap.end()) return "";
+    return m_pluginLibraryMap[plugin];
 }    
 
 Plugin *
 PluginLoader::load(PluginKey key, float inputSampleRate)
 {
-    std::string fullPath = getLibraryPath(key);
+    string fullPath = getLibraryPathForPlugin(key);
     if (fullPath == "") return 0;
     
-    std::string::size_type ki = key.find(':');
-    if (ki == std::string::npos) {
+    string::size_type ki = key.find(':');
+    if (ki == string::npos) {
         //!!! flag error
         return 0;
     }
 
-    std::string identifier = key.substr(ki + 1);
+    string identifier = key.substr(ki + 1);
     
     void *handle = DLOPEN(fullPath, RTLD_LAZY);
 
     if (!handle) {
-        std::cerr << "Vamp::PluginLoader: " << fullPath
+        cerr << "Vamp::PluginLoader: " << fullPath
                   << ": unable to load library (" << DLERROR()
-                  << ")" << std::endl;
+                  << ")" << endl;
         return 0;
     }
     
@@ -179,7 +176,7 @@ PluginLoader::load(PluginKey key, float inputSampleRate)
     const VampPluginDescriptor *descriptor = 0;
 
     while ((descriptor = fn(VAMP_API_VERSION, index))) {
-        if (std::string(descriptor->identifier) == identifier) {
+        if (string(descriptor->identifier) == identifier) {
             return new Vamp::PluginHostAdapter(descriptor, inputSampleRate);
         }
         ++index;
@@ -189,5 +186,118 @@ PluginLoader::load(PluginKey key, float inputSampleRate)
     return 0;
 }
 
+vector<string>
+PluginLoader::getFilesInDir(string dir, string extension)
+{
+    vector<string> files;
+
+    DIR *d = opendir(dir.c_str());
+    if (!d) return files;
+            
+    struct dirent *e = 0;
+    while ((e = readdir(d))) {
+        
+        if (!(e->d_type & DT_REG) || !e->d_name) {
+            continue;
+        }
+        
+        int len = strlen(e->d_name);
+        if (len < int(extension.length() + 2) ||
+            e->d_name[len - extension.length() - 1] != '.' ||
+            strcmp(e->d_name + len - extension.length(), extension.c_str())) {
+            continue;
+        }
+
+        files.push_back(e->d_name);
+    }
+
+    closedir(d);
+
+    return files;
 }
 
+void
+PluginLoader::generateTaxonomy()
+{
+//    cerr << "PluginLoader::generateTaxonomy" << endl;
+
+    vector<string> path = PluginHostAdapter::getPluginPath();
+    string libfragment = "/lib/";
+    vector<string> catpath;
+
+    string suffix = "cat";
+
+    for (vector<string>::iterator i = path.begin();
+         i != path.end(); ++i) {
+        
+        string dir = *i;
+        string::size_type li = dir.find(libfragment);
+
+        if (li != string::npos) {
+            catpath.push_back
+                (dir.substr(0, li)
+                 + "/share/"
+                 + dir.substr(li + libfragment.length()));
+        }
+
+        catpath.push_back(dir);
+    }
+
+    char buffer[1024];
+
+    for (vector<string>::iterator i = catpath.begin();
+         i != catpath.end(); ++i) {
+        
+        vector<string> files = getFilesInDir(*i, suffix);
+
+        for (vector<string>::iterator fi = files.begin();
+             fi != files.end(); ++fi) {
+
+            string filepath = *i + "/" + *fi; //!!! systemize
+            ifstream is(filepath.c_str(), ifstream::in | ifstream::binary);
+
+            if (is.fail()) {
+//                cerr << "failed to open: " << filepath << endl;
+                continue;
+            }
+
+//            cerr << "opened: " << filepath << endl;
+
+            while (!!is.getline(buffer, 1024)) {
+
+                string line(buffer);
+
+//                cerr << "line = " << line << endl;
+
+                string::size_type di = line.find("::");
+                if (di == string::npos) continue;
+
+                string id = line.substr(0, di);
+                string encodedCat = line.substr(di + 2);
+
+                if (id.substr(0, 5) != "vamp:") continue;
+                id = id.substr(5);
+
+                while (encodedCat.length() >= 1 &&
+                       encodedCat[encodedCat.length()-1] == '\r') {
+                    encodedCat = encodedCat.substr(0, encodedCat.length()-1);
+                }
+
+//                cerr << "id = " << id << ", cat = " << encodedCat << endl;
+
+                PluginCategoryHierarchy category;
+                string::size_type ai;
+                while ((ai = encodedCat.find(" > ")) != string::npos) {
+                    category.push_back(encodedCat.substr(0, ai));
+                    encodedCat = encodedCat.substr(ai + 3);
+                }
+                if (encodedCat != "") category.push_back(encodedCat);
+
+                m_taxonomy[id] = category;
+            }
+        }
+    }
+}    
+
+
+}

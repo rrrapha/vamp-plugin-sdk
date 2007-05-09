@@ -34,47 +34,55 @@
     authorization.
 */
 
-#ifndef _VAMP_PLUGIN_LOADER_H_
-#define _VAMP_PLUGIN_LOADER_H_
+#ifndef _PLUGIN_WRAPPER_H_
 
-#include <vector>
-#include <string>
-#include <map>
+#include <vamp-sdk/Plugin.h>
 
 namespace Vamp {
 
-class Plugin;
-
-class PluginLoader
+class PluginWrapper : public Plugin
 {
 public:
-    PluginLoader();
-    virtual ~PluginLoader();
+    virtual ~PluginWrapper();
+    
+    bool initialise(size_t channels, size_t stepSize, size_t blockSize);
+    void reset();
 
-    typedef std::string PluginKey;
-    typedef std::vector<std::string> PluginCategoryHierarchy;
+    InputDomain getInputDomain() const;
 
-    std::vector<PluginKey> listPlugins(); //!!! pass in version number?
+    unsigned int getVampApiVersion() const;
+    std::string getIdentifier() const;
+    std::string getName() const;
+    std::string getDescription() const;
+    std::string getMaker() const;
+    int getPluginVersion() const;
+    std::string getCopyright() const;
 
-    //!!! want to be able to just "delete" the plugin later -- hence
-    //have to consider library loading issues -- do we have a wrapper
-    //class that tells us when it's been deleted, and keep a reference
-    //count for the dynamic library?
-    Plugin *load(PluginKey plugin, float inputSampleRate);
+    ParameterList getParameterDescriptors() const;
+    float getParameter(std::string) const;
+    void setParameter(std::string, float);
 
-    PluginCategoryHierarchy getPluginCategory(PluginKey plugin);
+    ProgramList getPrograms() const;
+    std::string getCurrentProgram() const;
+    void selectProgram(std::string);
 
-    std::string getLibraryPathForPlugin(PluginKey plugin);
+    size_t getPreferredStepSize() const;
+    size_t getPreferredBlockSize() const;
+
+    size_t getMinChannelCount() const;
+    size_t getMaxChannelCount() const;
+
+    OutputList getOutputDescriptors() const;
+
+    FeatureSet process(const float *const *inputBuffers, RealTime timestamp);
+
+    FeatureSet getRemainingFeatures();
 
 protected:
-    std::map<PluginKey, std::string> m_pluginLibraryMap;
-    std::map<PluginKey, PluginCategoryHierarchy> m_taxonomy;
-    void generateTaxonomy();
-    std::vector<std::string> getFilesInDir(std::string dir, std::string ext);
+    PluginWrapper(Plugin *plugin); // I take ownership of plugin
+    Plugin *m_plugin;
 };
 
 }
 
-
 #endif
-

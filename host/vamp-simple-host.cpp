@@ -376,7 +376,7 @@ enumeratePlugins()
     LibraryMap libraryMap;
 
     for (size_t i = 0; i < plugins.size(); ++i) {
-        std::string path = loader.getLibraryPath(plugins[i]);
+        std::string path = loader.getLibraryPathForPlugin(plugins[i]);
         libraryMap.insert(LibraryMap::value_type(path, plugins[i]));
     }
 
@@ -406,6 +406,17 @@ enumeratePlugins()
                  << plugin->getName() << ", \""
                  << plugin->getIdentifier() << "\"" << " ["
                  << plugin->getMaker() << "]" << endl;
+
+//            cerr << "looking up category for " << key << " ..." << endl;
+            Vamp::PluginLoader::PluginCategoryHierarchy category =
+                loader.getPluginCategory(key);
+            if (!category.empty()) {
+                cerr << "       ";
+                for (size_t ci = 0; ci < category.size(); ++ci) {
+                    cerr << " > " << category[ci];
+                }
+                cerr << endl;
+            }
 
             if (plugin->getDescription() != "") {
                 cerr << "        - " << plugin->getDescription() << endl;

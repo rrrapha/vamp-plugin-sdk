@@ -36,7 +36,7 @@
 
 #ifndef _PLUGIN_INPUT_DOMAIN_ADAPTER_H_
 
-#include <vamp-sdk/Plugin.h>
+#include "PluginWrapper.h"
 
 namespace Vamp {
 
@@ -62,44 +62,20 @@ namespace Vamp {
 //delegates all calls through to it; the subclass can then override
 //only the ones it needs to handle.
 
-class PluginInputDomainAdapter : public Plugin
+class PluginInputDomainAdapter : public PluginWrapper
 {
 public:
     PluginInputDomainAdapter(Plugin *plugin); // I take ownership of plugin
     virtual ~PluginInputDomainAdapter();
     
     bool initialise(size_t channels, size_t stepSize, size_t blockSize);
-    void reset();
 
-    InputDomain getInputDomain() const { return Plugin::TimeDomain; }
-
-    unsigned int getVampApiVersion() const;
-    std::string getIdentifier() const;
-    std::string getName() const;
-    std::string getDescription() const;
-    std::string getMaker() const;
-    int getPluginVersion() const;
-    std::string getCopyright() const;
-
-    ParameterList getParameterDescriptors() const;
-    float getParameter(std::string) const;
-    void setParameter(std::string, float);
-
-    ProgramList getPrograms() const;
-    std::string getCurrentProgram() const;
-    void selectProgram(std::string);
+    InputDomain getInputDomain() const;
 
     size_t getPreferredStepSize() const;
     size_t getPreferredBlockSize() const;
 
-    size_t getMinChannelCount() const;
-    size_t getMaxChannelCount() const;
-
-    OutputList getOutputDescriptors() const;
-
     FeatureSet process(const float *const *inputBuffers, RealTime timestamp);
-
-    FeatureSet getRemainingFeatures();
 
 protected:
     Plugin *m_plugin;
