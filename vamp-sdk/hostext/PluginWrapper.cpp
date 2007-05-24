@@ -38,8 +38,11 @@
 
 namespace Vamp {
 
+namespace HostExt {
+
 PluginWrapper::PluginWrapper(Plugin *plugin) :
-    Plugin(0)
+    Plugin(0),
+    m_plugin(plugin)
 {
 }
 
@@ -183,6 +186,8 @@ Plugin::FeatureSet
 PluginWrapper::getRemainingFeatures()
 {
     return m_plugin->getRemainingFeatures();
+}
+
 }
 
 }

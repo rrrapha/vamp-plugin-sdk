@@ -379,7 +379,7 @@ public:
 
     /**
      * Used to distinguish between Vamp::Plugin and other potential
-     * sibling subclasses of PluginBase.  Do not implement this
+     * sibling subclasses of PluginBase.  Do not reimplement this
      * function in your subclass.
      */
     virtual std::string getType() const { return "Feature Extraction Plugin"; }

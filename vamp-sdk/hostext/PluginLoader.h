@@ -41,40 +41,67 @@
 #include <string>
 #include <map>
 
+#include "PluginWrapper.h"
+
 namespace Vamp {
 
 class Plugin;
 
+namespace HostExt {
+
 class PluginLoader
 {
 public:
-    PluginLoader();
-    virtual ~PluginLoader();
+    static PluginLoader *getInstance();
 
     typedef std::string PluginKey;
     typedef std::vector<std::string> PluginCategoryHierarchy;
 
     std::vector<PluginKey> listPlugins(); //!!! pass in version number?
 
-    //!!! want to be able to just "delete" the plugin later -- hence
-    //have to consider library loading issues -- do we have a wrapper
-    //class that tells us when it's been deleted, and keep a reference
-    //count for the dynamic library?
-    Plugin *load(PluginKey plugin, float inputSampleRate);
+    PluginKey composePluginKey(std::string libraryName, std::string identifier);
+
+    Plugin *loadPlugin(PluginKey plugin, float inputSampleRate);
 
     PluginCategoryHierarchy getPluginCategory(PluginKey plugin);
 
     std::string getLibraryPathForPlugin(PluginKey plugin);
 
 protected:
-    std::map<PluginKey, std::string> m_pluginLibraryMap;
+    PluginLoader();
+    virtual ~PluginLoader();
+
+    class PluginDeletionNotifyAdapter : public PluginWrapper {
+    public:
+        PluginDeletionNotifyAdapter(Plugin *plugin, PluginLoader *loader);
+        virtual ~PluginDeletionNotifyAdapter();
+    protected:
+        PluginLoader *m_loader;
+    };
+
+    virtual void pluginDeleted(PluginDeletionNotifyAdapter *adapter);
+
+    std::map<PluginKey, std::string> m_pluginLibraryNameMap;
+    void generateLibraryMap();
+
     std::map<PluginKey, PluginCategoryHierarchy> m_taxonomy;
     void generateTaxonomy();
-    std::vector<std::string> getFilesInDir(std::string dir, std::string ext);
+
+    std::map<Plugin *, void *> m_pluginLibraryHandleMap;
+
+    void *loadLibrary(std::string path);
+    void unloadLibrary(void *handle);
+    void *lookupInLibrary(void *handle, const char *symbol);
+
+    std::string splicePath(std::string a, std::string b);
+    std::vector<std::string> listFiles(std::string dir, std::string ext);
+
+    static PluginLoader *m_instance;
 };
 
 }
 
+}
 
 #endif
 

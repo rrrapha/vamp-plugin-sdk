@@ -3,8 +3,6 @@
 # libraries, example plugins, and the test host.  Please adjust to
 # suit your operating system requirements.
 
-## Choose your 
-
 APIDIR		= vamp
 SDKDIR		= vamp-sdk
 HOSTEXTDIR      = vamp-sdk/hostext
@@ -29,7 +27,7 @@ default:	all
 
 # Compile flags
 #
-CXXFLAGS	:= $(CXXFLAGS) -O2 -Wall -I$(SDKDIR) -I$(HOSTEXTDIR) -I$(APIDIR) -I.
+CXXFLAGS	:= $(CXXFLAGS) -g -Wall -I.
 
 # Libraries required for the plugins.
 # (Note that it is desirable to statically link libstdc++ if possible,
@@ -94,6 +92,7 @@ HOSTSDK_HEADERS	= \
 		$(SDKDIR)/Plugin.h \
 		$(SDKDIR)/PluginBase.h \
 		$(SDKDIR)/PluginHostAdapter.h \
+		$(HOSTEXTDIR)/PluginChannelAdapter.h \
 		$(HOSTEXTDIR)/PluginInputDomainAdapter.h \
 		$(HOSTEXTDIR)/PluginLoader.h \
 		$(HOSTEXTDIR)/PluginWrapper.h \
@@ -105,6 +104,7 @@ SDK_OBJECTS	= \
 
 HOSTSDK_OBJECTS	= \
 		$(SDKDIR)/PluginHostAdapter.o \
+		$(HOSTEXTDIR)/PluginChannelAdapter.o \
 		$(HOSTEXTDIR)/PluginInputDomainAdapter.o \
 		$(HOSTEXTDIR)/PluginLoader.o \
 		$(HOSTEXTDIR)/PluginWrapper.o \
@@ -152,9 +152,9 @@ HOST_TARGET	= \
 
 sdk:		$(SDK_STATIC) $(SDK_DYNAMIC) $(HOSTSDK_STATIC) $(HOSTSDK_DYNAMIC)
 
-plugins:	sdk $(PLUGIN_TARGET)
+plugins:	$(PLUGIN_TARGET)
 
-host:		sdk $(HOST_TARGET)
+host:		$(HOST_TARGET)
 
 all:		sdk plugins host test
 
@@ -170,14 +170,14 @@ $(SDK_DYNAMIC):	$(SDK_OBJECTS) $(API_HEADERS) $(SDK_HEADERS)
 $(HOSTSDK_DYNAMIC):	$(HOSTSDK_OBJECTS) $(API_HEADERS) $(HOSTSDK_HEADERS)
 		$(CXX) $(LDFLAGS) $(PLUGIN_LDFLAGS) -o $@ $(HOSTSDK_OBJECTS)
 
-$(PLUGIN_TARGET):	$(PLUGIN_OBJECTS) $(SDK_TARGET) $(PLUGIN_HEADERS)
+$(PLUGIN_TARGET):	$(PLUGIN_OBJECTS) $(SDK_STATIC) $(PLUGIN_HEADERS)
 		$(CXX) $(LDFLAGS) $(PLUGIN_LDFLAGS) -o $@ $(PLUGIN_OBJECTS) $(PLUGIN_LIBS)
 
-$(HOST_TARGET):	$(HOST_OBJECTS) $(HOSTSDK_TARGET) $(HOST_HEADERS)
+$(HOST_TARGET):	$(HOST_OBJECTS) $(HOSTSDK_STATIC) $(HOST_HEADERS)
 		$(CXX) $(LDFLAGS) $(HOST_LDFLAGS) -o $@ $(HOST_OBJECTS) $(HOST_LIBS)
 
 test:		plugins host
-		$(HOST_TARGET) $(PLUGIN_TARGET)
+		VAMP_PATH=$(EXAMPLEDIR) $(HOST_TARGET) -l
 
 clean:		
 		rm -f $(SDK_OBJECTS) $(HOSTSDK_OBJECTS) $(PLUGIN_OBJECTS) $(HOST_OBJECTS)

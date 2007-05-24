@@ -40,6 +40,8 @@
 
 namespace Vamp {
 
+namespace HostExt {
+
 PluginInputDomainAdapter::PluginInputDomainAdapter(Plugin *plugin) :
     PluginWrapper(plugin),
     m_channels(0),
@@ -55,7 +57,7 @@ PluginInputDomainAdapter::~PluginInputDomainAdapter()
 bool
 PluginInputDomainAdapter::initialise(size_t channels, size_t stepSize, size_t blockSize)
 {
-    //!!! complain and die if blocksize is not a power of 2
+    //!!! complain and adapt-or-die if blocksize is not a power of 2
 
     if (m_plugin->getInputDomain() == FrequencyDomain) {
         if (m_channels > 0) {
@@ -106,6 +108,8 @@ PluginInputDomainAdapter::getPreferredStepSize() const
 size_t
 PluginInputDomainAdapter::getPreferredBlockSize() const
 {
+    //!!! complain and adapt-or-die if blocksize is not a power of 2
+
     size_t block = m_plugin->getPreferredBlockSize();
 
     if (block == 0 && (m_plugin->getInputDomain() == FrequencyDomain)) {
@@ -269,6 +273,7 @@ PluginInputDomainAdapter::fft(unsigned int n, bool inverse,
     }
 }
 
+}
         
 }
 

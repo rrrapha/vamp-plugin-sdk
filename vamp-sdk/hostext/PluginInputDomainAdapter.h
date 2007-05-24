@@ -34,11 +34,14 @@
     authorization.
 */
 
-#ifndef _PLUGIN_INPUT_DOMAIN_ADAPTER_H_
+#ifndef _VAMP_PLUGIN_INPUT_DOMAIN_ADAPTER_H_
+#define _VAMP_PLUGIN_INPUT_DOMAIN_ADAPTER_H_
 
 #include "PluginWrapper.h"
 
 namespace Vamp {
+
+namespace HostExt {
 
 /**
  * An adapter that converts time-domain input into frequency-domain
@@ -78,7 +81,6 @@ public:
     FeatureSet process(const float *const *inputBuffers, RealTime timestamp);
 
 protected:
-    Plugin *m_plugin;
     size_t m_channels;
     size_t m_blockSize;
     float **m_freqbuf;
@@ -89,6 +91,8 @@ protected:
     void fft(unsigned int n, bool inverse,
              double *ri, double *ii, double *ro, double *io);
 };
+
+}
 
 }
 

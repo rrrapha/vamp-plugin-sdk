@@ -34,11 +34,14 @@
     authorization.
 */
 
-#ifndef _PLUGIN_WRAPPER_H_
+#ifndef _VAMP_PLUGIN_WRAPPER_H_
+#define _VAMP_PLUGIN_WRAPPER_H_
 
 #include <vamp-sdk/Plugin.h>
 
 namespace Vamp {
+
+namespace HostExt {
 
 class PluginWrapper : public Plugin
 {
@@ -82,6 +85,8 @@ protected:
     PluginWrapper(Plugin *plugin); // I take ownership of plugin
     Plugin *m_plugin;
 };
+
+}
 
 }
 
