@@ -92,7 +92,11 @@ Derry Fitzgerald, Eugene Coyle and Bob Lawlor, ISSC 2005.
 
 A simple command-line Vamp host, capable of loading a plugin and using
 it to process a complete audio file, with its default parameters.
-Requires libsndfile.
+Requires libsndfile (http://www.mega-nerd.com/libsndfile/).
+
+If you don't have libsndfile, you may want to edit the Makefile to
+change the default build target from "all" to "sdk" so as to compile
+only the SDK.
 
 
 Plugin Lookup and Categorisation
