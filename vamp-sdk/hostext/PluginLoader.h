@@ -55,9 +55,10 @@ public:
     static PluginLoader *getInstance();
 
     typedef std::string PluginKey;
+    typedef std::vector<PluginKey> PluginKeyList;
     typedef std::vector<std::string> PluginCategoryHierarchy;
 
-    std::vector<PluginKey> listPlugins(); //!!! pass in version number?
+    PluginKeyList listPlugins(); //!!! pass in version number?
 
     PluginKey composePluginKey(std::string libraryName, std::string identifier);
 

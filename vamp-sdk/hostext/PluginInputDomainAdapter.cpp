@@ -126,6 +126,10 @@ PluginInputDomainAdapter::process(const float *const *inputBuffers, RealTime tim
         return m_plugin->process(inputBuffers, timestamp);
     }
 
+    //!!! need to compensate for the fact that the first block is aligned
+    // with the zero frame but for frequency domain we want it to be
+    // centred on the zero frame 
+
     for (size_t c = 0; c < m_channels; ++c) {
 
         for (size_t i = 0; i < m_blockSize; ++i) {
