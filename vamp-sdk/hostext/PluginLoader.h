@@ -62,7 +62,15 @@ public:
 
     PluginKey composePluginKey(std::string libraryName, std::string identifier);
 
-    Plugin *loadPlugin(PluginKey plugin, float inputSampleRate);
+    enum AdapterFlags {
+        ADAPT_INPUT_DOMAIN  = 0x01,
+        ADAPT_CHANNEL_COUNT = 0x02,
+        ADAPT_ALL           = 0xff
+    };
+
+    Plugin *loadPlugin(PluginKey plugin,
+                       float inputSampleRate,
+                       int adapterFlags = 0);
 
     PluginCategoryHierarchy getPluginCategory(PluginKey plugin);
 

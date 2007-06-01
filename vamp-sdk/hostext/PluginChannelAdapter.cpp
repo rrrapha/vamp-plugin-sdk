@@ -80,8 +80,10 @@ PluginChannelAdapter::initialise(size_t channels, size_t stepSize, size_t blockS
 
     m_inputChannels = channels;
 
-    if (channels < minch) {
+    if (m_inputChannels < minch) {
+
         m_forwardPtrs = new const float *[minch];
+
         if (m_inputChannels > 1) {
             // We need a set of zero-valued buffers to add to the
             // forwarded pointers
@@ -93,30 +95,45 @@ PluginChannelAdapter::initialise(size_t channels, size_t stepSize, size_t blockS
                 }
             }
         }
-        m_pluginChannels = minch;
-        return m_plugin->initialise(minch, stepSize, blockSize);
-    }
 
-    if (channels > maxch) {
+        m_pluginChannels = minch;
+
+        std::cerr << "PluginChannelAdapter::initialise: expanding " << m_inputChannels << " to " << m_pluginChannels << " for plugin" << std::endl;
+
+    } else if (m_inputChannels > maxch) {
+
         // We only need m_buffer if we are mixing down to a single
         // channel -- otherwise we can just forward the same float* as
         // passed in to process(), expecting the excess to be ignored
+
         if (maxch == 1) {
             m_buffer = new float *[1];
             m_buffer[0] = new float[blockSize];
+
+            std::cerr << "PluginChannelAdapter::initialise: mixing " << m_inputChannels << " to mono for plugin" << std::endl;
+
+        } else {
+            
+            std::cerr << "PluginChannelAdapter::initialise: reducing " << m_inputChannels << " to " << m_pluginChannels << " for plugin" << std::endl;
         }
+
         m_pluginChannels = maxch;
-        return m_plugin->initialise(maxch, stepSize, blockSize);
+
+    } else {
+ 
+        std::cerr << "PluginChannelAdapter::initialise: accepting given number of channels (" << m_inputChannels << ")" << std::endl;
+        m_pluginChannels = m_inputChannels;
     }
 
-    m_pluginChannels = channels;
-    return m_plugin->initialise(channels, stepSize, blockSize);
+    return m_plugin->initialise(m_pluginChannels, stepSize, blockSize);
 }
 
 PluginChannelAdapter::FeatureSet
 PluginChannelAdapter::process(const float *const *inputBuffers,
                               RealTime timestamp)
 {
+    std::cerr << "PluginChannelAdapter::process: " << m_inputChannels << " -> " << m_pluginChannels << " channels" << std::endl;
+
     if (m_inputChannels < m_pluginChannels) {
 
         if (m_inputChannels == 1) {
@@ -133,9 +150,8 @@ PluginChannelAdapter::process(const float *const *inputBuffers,
         }
 
         return m_plugin->process(m_forwardPtrs, timestamp);
-    }
 
-    if (m_inputChannels > m_pluginChannels) {
+    } else if (m_inputChannels > m_pluginChannels) {
 
         if (m_pluginChannels == 1) {
             for (size_t j = 0; j < m_blockSize; ++j) {
@@ -153,9 +169,11 @@ PluginChannelAdapter::process(const float *const *inputBuffers,
         } else {
             return m_plugin->process(inputBuffers, timestamp);
         }
-    }
 
-    return m_plugin->process(inputBuffers, timestamp);
+    } else {
+
+        return m_plugin->process(inputBuffers, timestamp);
+    }
 }
 
 }

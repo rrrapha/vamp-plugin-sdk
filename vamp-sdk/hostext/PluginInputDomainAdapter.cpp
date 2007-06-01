@@ -57,32 +57,44 @@ PluginInputDomainAdapter::~PluginInputDomainAdapter()
 bool
 PluginInputDomainAdapter::initialise(size_t channels, size_t stepSize, size_t blockSize)
 {
-    //!!! complain and adapt-or-die if blocksize is not a power of 2
+    if (m_plugin->getInputDomain() == TimeDomain) {
 
-    if (m_plugin->getInputDomain() == FrequencyDomain) {
-        if (m_channels > 0) {
-            for (size_t c = 0; c < m_channels; ++c) {
-                delete[] m_freqbuf[c];
-            }
-            delete[] m_freqbuf;
-            delete[] m_ri;
-            delete[] m_ro;
-            delete[] m_io;
-        }
+        m_blockSize = blockSize;
+        m_channels = channels;
+
+        return m_plugin->initialise(channels, stepSize, blockSize);
     }
 
-    m_channels = channels;
-    m_blockSize = blockSize;
+    if (blockSize < 2) {
+        std::cerr << "ERROR: Vamp::HostExt::PluginInputDomainAdapter::initialise: blocksize < 2 not supported" << std::endl;
+        return false;
+    }                
+        
+    if (blockSize & (blockSize-1)) {
+        std::cerr << "ERROR: Vamp::HostExt::PluginInputDomainAdapter::initialise: non-power-of-two\nblocksize " << blockSize << " not supported" << std::endl;
+        return false;
+    }
 
-    if (m_plugin->getInputDomain() == FrequencyDomain) {
-        m_freqbuf = new float *[m_channels];
+    if (m_channels > 0) {
         for (size_t c = 0; c < m_channels; ++c) {
-            m_freqbuf[c] = new float[m_blockSize + 2];
+            delete[] m_freqbuf[c];
         }
-        m_ri = new double[m_blockSize];
-        m_ro = new double[m_blockSize];
-        m_io = new double[m_blockSize];
+        delete[] m_freqbuf;
+        delete[] m_ri;
+        delete[] m_ro;
+        delete[] m_io;
     }
+
+    m_blockSize = blockSize;
+    m_channels = channels;
+
+    m_freqbuf = new float *[m_channels];
+    for (size_t c = 0; c < m_channels; ++c) {
+        m_freqbuf[c] = new float[m_blockSize + 2];
+    }
+    m_ri = new double[m_blockSize];
+    m_ro = new double[m_blockSize];
+    m_io = new double[m_blockSize];
 
     return m_plugin->initialise(channels, stepSize, blockSize);
 }
@@ -108,15 +120,54 @@ PluginInputDomainAdapter::getPreferredStepSize() const
 size_t
 PluginInputDomainAdapter::getPreferredBlockSize() const
 {
-    //!!! complain and adapt-or-die if blocksize is not a power of 2
-
     size_t block = m_plugin->getPreferredBlockSize();
 
-    if (block == 0 && (m_plugin->getInputDomain() == FrequencyDomain)) {
-        block = 1024;
+    if (m_plugin->getInputDomain() == FrequencyDomain) {
+        if (block == 0) {
+            block = 1024;
+        } else {
+            block = makeBlockSizeAcceptable(block);
+        }
     }
 
     return block;
+}
+
+size_t
+PluginInputDomainAdapter::makeBlockSizeAcceptable(size_t blockSize) const
+{
+    if (blockSize < 2) {
+
+        std::cerr << "WARNING: Vamp::HostExt::PluginInputDomainAdapter::initialise: blocksize < 2 not" << std::endl
+                  << "supported, increasing from " << blockSize << " to 2" << std::endl;
+        blockSize = 2;
+        
+    } else if (blockSize & (blockSize-1)) {
+            
+        // not a power of two, can't handle that with our current fft
+        // implementation
+
+        size_t nearest = blockSize;
+        size_t power = 0;
+        while (nearest > 1) {
+            nearest >>= 1;
+            ++power;
+        }
+        nearest = 1;
+        while (power) {
+            nearest <<= 1;
+            --power;
+        }
+        
+        if (blockSize - nearest > (nearest*2) - blockSize) {
+            nearest = nearest*2;
+        }
+        
+        std::cerr << "WARNING: Vamp::HostExt::PluginInputDomainAdapter::initialise: non-power-of-two\nblocksize " << blockSize << " not supported, using blocksize " << nearest << " instead" << std::endl;
+        blockSize = nearest;
+    }
+
+    return blockSize;
 }
 
 Plugin::FeatureSet
@@ -126,9 +177,54 @@ PluginInputDomainAdapter::process(const float *const *inputBuffers, RealTime tim
         return m_plugin->process(inputBuffers, timestamp);
     }
 
-    //!!! need to compensate for the fact that the first block is aligned
-    // with the zero frame but for frequency domain we want it to be
-    // centred on the zero frame 
+    // The timestamp supplied should be (according to the Vamp::Plugin
+    // spec) the time of the start of the time-domain input block.
+    // However, we want to pass to the plugin an FFT output calculated
+    // from the block of samples _centred_ on that timestamp.
+    // 
+    // We have two options:
+    // 
+    // 1. Buffer the input, calculating the fft of the values at the
+    // passed-in block minus blockSize/2 rather than starting at the
+    // passed-in block.  So each time we call process on the plugin,
+    // we are passing in the same timestamp as was passed to our own
+    // process plugin, but not (the frequency domain representation
+    // of) the same set of samples.  Advantages: avoids confusion in
+    // the host by ensuring the returned values have timestamps
+    // comparable with that passed in to this function (in fact this
+    // is pretty much essential for one-value-per-block outputs);
+    // consistent with hosts such as SV that deal with the
+    // frequency-domain transform themselves.  Disadvantages: means
+    // making the not necessarily correct assumption that the samples
+    // preceding the first official block are all zero (or some other
+    // known value).
+    //
+    // 2. Increase the passed-in timestamps by half the blocksize.  So
+    // when we call process, we are passing in the frequency domain
+    // representation of the same set of samples as passed to us, but
+    // with a different timestamp.  Advantages: simplicity; avoids
+    // iffy assumption mentioned above.  Disadvantages: inconsistency
+    // with SV in cases where stepSize != blockSize/2; potential
+    // confusion arising from returned timestamps being calculated
+    // from the adjusted input timestamps rather than the original
+    // ones (and inaccuracy where the returned timestamp is implied,
+    // as in one-value-per-block).
+    //
+    // Neither way is ideal, but I don't think either is strictly
+    // incorrect either.  I think this is just a case where the same
+    // plugin can legitimately produce differing results from the same
+    // input data, depending on how that data is packaged.
+    // 
+    // We'll go for option 2, adjusting the timestamps.  Note in
+    // particular that this means some results can differ from those
+    // produced by SV.
+
+    std::cerr << "PluginInputDomainAdapter: sampleRate " << m_inputSampleRate << ", blocksize " << m_blockSize << ", adjusting time from " << timestamp;
+
+    timestamp = timestamp + RealTime::frame2RealTime(m_blockSize/2,
+                                                     m_inputSampleRate);
+
+    std::cerr << " to " << timestamp << std::endl;
 
     for (size_t c = 0; c < m_channels; ++c) {
 
@@ -148,14 +244,11 @@ PluginInputDomainAdapter::process(const float *const *inputBuffers, RealTime tim
 
         fft(m_blockSize, false, m_ri, 0, m_ro, m_io);
 
-        for (size_t i = 0; i < m_blockSize/2; ++i) {
+        for (size_t i = 0; i <= m_blockSize/2; ++i) {
             m_freqbuf[c][i * 2] = m_ro[i];
             m_freqbuf[c][i * 2 + 1] = m_io[i];
         }
     }
-
-    //!!! do we want to adjust the timestamp or anything so as to
-    // effectively centre the frame?
 
     return m_plugin->process(m_freqbuf, timestamp);
 }

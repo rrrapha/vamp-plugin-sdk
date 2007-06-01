@@ -36,6 +36,8 @@
 
 #include "vamp-sdk/PluginHostAdapter.h"
 #include "PluginLoader.h"
+#include "PluginInputDomainAdapter.h"
+#include "PluginChannelAdapter.h"
 
 #include <fstream>
 
@@ -171,7 +173,7 @@ PluginLoader::getLibraryPathForPlugin(PluginKey plugin)
 }    
 
 Plugin *
-PluginLoader::loadPlugin(PluginKey key, float inputSampleRate)
+PluginLoader::loadPlugin(PluginKey key, float inputSampleRate, int adapterFlags)
 {
     string fullPath = getLibraryPathForPlugin(key);
     if (fullPath == "") return 0;
@@ -206,10 +208,20 @@ PluginLoader::loadPlugin(PluginKey key, float inputSampleRate)
             Vamp::PluginHostAdapter *plugin =
                 new Vamp::PluginHostAdapter(descriptor, inputSampleRate);
 
-            PluginDeletionNotifyAdapter *adapter =
-                new PluginDeletionNotifyAdapter(plugin, this);
+            Plugin *adapter = new PluginDeletionNotifyAdapter(plugin, this);
 
             m_pluginLibraryHandleMap[adapter] = handle;
+
+            if (adapterFlags & ADAPT_INPUT_DOMAIN) {
+                if (adapter->getInputDomain() == Plugin::FrequencyDomain) {
+                    adapter = new PluginInputDomainAdapter(adapter);
+                }
+            }
+
+            if (adapterFlags & ADAPT_CHANNEL_COUNT) {
+                adapter = new PluginChannelAdapter(adapter);
+            }
+
             return adapter;
         }
 

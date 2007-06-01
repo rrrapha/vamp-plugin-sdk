@@ -40,8 +40,14 @@ namespace Vamp {
 
 namespace HostExt {
 
+class PluginRateExtractor : public Plugin
+{
+public:
+    float getRate() const { return m_inputSampleRate; }
+};
+
 PluginWrapper::PluginWrapper(Plugin *plugin) :
-    Plugin(0),
+    Plugin(((PluginRateExtractor *)plugin)->getRate()),
     m_plugin(plugin)
 {
 }
@@ -50,7 +56,7 @@ PluginWrapper::~PluginWrapper()
 {
     delete m_plugin;
 }
-    
+
 bool
 PluginWrapper::initialise(size_t channels, size_t stepSize, size_t blockSize)
 {

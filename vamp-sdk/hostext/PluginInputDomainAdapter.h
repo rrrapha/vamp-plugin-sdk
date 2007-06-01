@@ -90,6 +90,8 @@ protected:
 
     void fft(unsigned int n, bool inverse,
              double *ri, double *ii, double *ro, double *io);
+
+    size_t makeBlockSizeAcceptable(size_t) const;
 };
 
 }

@@ -181,17 +181,14 @@ int runPlugin(string myname, string soname, string id,
 	return 1;
     }
 
-    Vamp::Plugin *basePlugin = loader->loadPlugin(key, sfinfo.samplerate);
-    if (!basePlugin) {
+    Vamp::Plugin *plugin = loader->loadPlugin
+        (key, sfinfo.samplerate, PluginLoader::ADAPT_ALL);
+    if (!plugin) {
         cerr << myname << ": ERROR: Failed to load plugin \"" << id
              << "\" from library \"" << soname << "\"" << endl;
         sf_close(sndfile);
         return 1;
     }
-
-    Vamp::Plugin *plugin =
-        new Vamp::HostExt::PluginChannelAdapter
-        (new Vamp::HostExt::PluginInputDomainAdapter(basePlugin));
 
     cerr << "Running plugin: \"" << plugin->getIdentifier() << "\"..." << endl;
 
