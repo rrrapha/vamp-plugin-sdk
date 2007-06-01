@@ -43,6 +43,15 @@ namespace Vamp {
 
 namespace HostExt {
 
+/**
+ * PluginWrapper is a simple base class for adapter plugins.  It takes
+ * a pointer to a "to be wrapped" Vamp plugin on construction, and
+ * provides implementations of all the Vamp plugin methods that simply
+ * delegate through to the wrapped plugin.  A subclass can therefore
+ * override only the methods that are meaningful for the particular
+ * adapter.
+ */
+
 class PluginWrapper : public Plugin
 {
 public:

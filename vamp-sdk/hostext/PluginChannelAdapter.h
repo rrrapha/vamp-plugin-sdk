@@ -78,6 +78,22 @@ namespace HostExt {
  *
  * Hosts requiring a different channel policy from the above will need
  * to implement it themselves, instead of using PluginChannelAdapter.
+ *
+ * Note that PluginChannelAdapter does not override the minimum and
+ * maximum channel counts returned by the wrapped plugin.  The host
+ * will need to be aware that it is using a PluginChannelAdapter, and
+ * be prepared to ignore these counts as necessary.  (This contrasts
+ * with the approach used in PluginInputDomainAdapter, which aims to
+ * make the host completely unaware of which underlying input domain
+ * is in fact in use.)
+ * 
+ * The rationale for this is that a host may wish to use the
+ * PluginChannelAdapter but still discriminate in some way on the
+ * basis of the number of channels actually supported.  For example, a
+ * simple stereo audio host may prefer to reject plugins that require
+ * more than two channels on the grounds that doesn't actually
+ * understand what they are for, rather than allow the channel adapter
+ * to make a potentially meaningless channel conversion for them.
  */
 
 class PluginChannelAdapter : public PluginWrapper

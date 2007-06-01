@@ -44,26 +44,33 @@ namespace Vamp {
 namespace HostExt {
 
 /**
- * An adapter that converts time-domain input into frequency-domain
- * input for plugins that need it.  In every other respect this
- * adapter behaves like the plugin it wraps.  The wrapped plugin may
- * be a time-domain plugin, in which case this wrapper does nothing.
+ * PluginInputDomainAdapter is a Vamp plugin adapter that converts
+ * time-domain input into frequency-domain input for plugins that need
+ * it.  This permits a host to use time- and frequency-domain plugins
+ * interchangeably without needing to handle the conversion itself.
  *
- * Uses a Hanning windowed FFT.  The FFT implementation is not the
- * fastest, so a host can do much better if it cares enough, but it is
- * simple and self-contained.
+ * This adapter uses a basic Hanning windowed FFT that supports
+ * power-of-two block sizes only.  If a frequency domain plugin
+ * requests a non-power-of-two blocksize, the adapter will adjust it
+ * to a nearby power of two instead.  Thus, getPreferredBlockSize()
+ * will always return a power of two if the wrapped plugin is a
+ * frequency domain one.  If the plugin doesn't accept the adjusted
+ * power of two block size, initialise() will fail.
  *
- * Note that this adapter does not support non-power-of-two block
- * sizes.
+ * The adapter provides no way for the host to discover whether the
+ * underlying plugin is actually a time or frequency domain plugin
+ * (except that if the preferred block size is not a power of two, it
+ * must be a time domain plugin).
+ *
+ * The FFT implementation is simple and self-contained, but unlikely
+ * to be the fastest available: a host can usually do better if it
+ * cares enough.
+ *
+ * In every respect other than its input domain handling, the
+ * PluginInputDomainAdapter behaves identically to the plugin that it
+ * wraps.  The wrapped plugin will be deleted when the wrapper is
+ * deleted.
  */
-
-//!!! It would also be nice to have a channel wrapper, which deals
-//with mixing down channels if the plugin needs a different number
-//from the input source.  It would have some sort of mixdown/channel
-//input policy selection.  Probably this class and that one should
-//both inherit a PluginAdapter class which contains a plugin and
-//delegates all calls through to it; the subclass can then override
-//only the ones it needs to handle.
 
 class PluginInputDomainAdapter : public PluginWrapper
 {

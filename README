@@ -77,6 +77,28 @@ Hosts may use the Vamp::PluginHostAdapter to convert the loaded
 plugin's C API back into a Vamp::Plugin object.  Hosts should link
 with -lvamp-hostsdk.
 
+ * vamp-sdk/hostext
+
+Additional C++ classes to make a host's life easier.
+
+Vamp::HostExt::PluginLoader provides a very simple interface for a
+host to discover, load, and find out category information about the
+available plugins.  Most "casual" Vamp hosts will probably want to use
+this class.
+
+Vamp::HostExt::PluginInputDomainAdapter provides a simple means for
+hosts to handle plugins that expect frequency-domain input, without
+having to convert the input themselves.
+
+Vamp::HostExt::PluginChannelAdapter provides a simple means for hosts
+to use plugins that do not necessarily support the same number of
+audio channels as they have available, without having to apply a
+channel management / mixdown policy themselves.
+
+The PluginLoader can use the input domain and channel adapters
+automatically to make the entire conversion process transparent to the
+host if required.
+
  * examples
 
 Example plugins implemented using the C++ classes.  ZeroCrossing
