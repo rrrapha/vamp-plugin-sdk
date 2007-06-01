@@ -44,9 +44,10 @@ namespace Vamp {
 namespace HostExt {
 
 /**
- * PluginChannelAdapter implements a policy for management of plugins
- * that expect a different number of input channels from the number
- * actually available in the source audio data.
+ * PluginChannelAdapter is a Vamp plugin adapter that implements a
+ * policy for management of plugins that expect a different number of
+ * input channels from the number actually available in the source
+ * audio data.
  *
  * A host using PluginChannelAdapter may ignore the getMinChannelCount
  * and getMaxChannelCount reported by the plugin, and still expect the
@@ -87,13 +88,18 @@ namespace HostExt {
  * make the host completely unaware of which underlying input domain
  * is in fact in use.)
  * 
- * The rationale for this is that a host may wish to use the
+ * (The rationale for this is that a host may wish to use the
  * PluginChannelAdapter but still discriminate in some way on the
  * basis of the number of channels actually supported.  For example, a
  * simple stereo audio host may prefer to reject plugins that require
  * more than two channels on the grounds that doesn't actually
  * understand what they are for, rather than allow the channel adapter
- * to make a potentially meaningless channel conversion for them.
+ * to make a potentially meaningless channel conversion for them.)
+ *
+ * In every respect other than its management of channels, the
+ * PluginChannelAdapter behaves identically to the plugin that it
+ * wraps.  The wrapped plugin will be deleted when the wrapper is
+ * deleted.
  */
 
 class PluginChannelAdapter : public PluginWrapper
